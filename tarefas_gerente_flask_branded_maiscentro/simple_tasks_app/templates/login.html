@@ -1,4 +1,3 @@
-
 {% extends "base.html" %}
 {% block content %}
 <div class="row justify-content-center">
@@ -6,20 +5,37 @@
     <div class="card shadow-sm">
       <div class="card-body">
         <h1 class="h4 mb-3">Entrar</h1>
+
         <form method="post">
           <div class="mb-3">
             <label class="form-label">E-mail</label>
-            <input type="email" name="email" class="form-control" required placeholder="voce@clinica.com">
+            <input
+              type="email"
+              name="email"
+              class="form-control"
+              required
+              placeholder="voce@clinica.com"
+            >
           </div>
+
           <div class="mb-3">
             <label class="form-label">Senha</label>
-            <input type="password" name="password" class="form-control" required placeholder="••••••••">
+            <input
+              type="password"
+              name="password"
+              class="form-control"
+              required
+              placeholder="••••••••"
+            >
           </div>
+
           <button class="btn btn-primary w-100">Entrar</button>
         </form>
 
         <div class="text-center mt-3">
           <a href="{{ url_for('register') }}">Criar conta (funcionária)</a>
+          <span class="text-muted"> · </span>
+          <a href="{{ url_for('register', as_manager=1) }}">Criar conta (gerência)</a>
         </div>
       </div>
     </div>
