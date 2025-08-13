@@ -141,8 +141,14 @@ def home():
 def tasks():
     status = request.args.get("status")
     q = Task.query.order_by(Task.created_at.desc())
+
+    # se não for gerente, mostra só as tarefas criadas pela usuária logada
+    if current_user.role != "manager":
+        q = q.filter(Task.created_by_id == current_user.id)
+
     if status in ("pendente", "concluida"):
         q = q.filter_by(status=status)
+
     items = q.all()
     return render_template("tasks.html", tasks=items, status=status)
 
