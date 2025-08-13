@@ -10,7 +10,7 @@ from io import StringIO
 # -------------------- Config --------------------
 app = Flask(__name__)
 
-# Health check super leve (use /healthz no Render)
+# Saúde para Render
 @app.route("/healthz")
 def healthz():
     return "ok", 200
@@ -94,24 +94,18 @@ def get_managers():
 
 def get_users():
     return User.query.order_by(User.name.asc()).all()
-# -------------------- Setup inicial (seguro) --------------------
-def init_db_safe():
-    try:
-        with app.app_context():
-            db.create_all()
-            # garante pelo menos 1 gerente
-            if not User.query.filter_by(role="manager").first():
-                admin = User(name="Gerente", email="admin@clinica.com", role="manager")
-                admin.set_password("admin123")
-                db.session.add(admin)
-                db.session.commit()
-        print("DB init OK")
-    except Exception as e:
-        # não derruba o boot se o banco estiver lento/indisponível
-        print("DB init pulado/erro:", e)
 
-# chama uma única vez na carga do app
-init_db_safe()
+# -------------------- Setup inicial (Flask 3) --------------------
+def init_db():
+    db.create_all()
+    if not User.query.filter_by(role="manager").first():
+        admin = User(name="Gerente", email="admin@clinica.com", role="manager")
+        admin.set_password("admin123")
+        db.session.add(admin)
+        db.session.commit()
+
+with app.app_context():
+    init_db()
 
 # -------------------- Autenticação --------------------
 @app.route("/login", methods=["GET", "POST"])
@@ -153,6 +147,125 @@ def register():
         return redirect(url_for("login"))
     return render_template("register.html")
 
+# -------------------- Perfil (usuário edita o próprio nome) --------------------
+@app.route("/profile", methods=["GET", "POST"])
+@login_required
+def profile():
+    if request.method == "POST":
+        name = (request.form.get("name") or "").strip()
+        if not name:
+            flash("O nome não pode ficar vazio.", "danger")
+        else:
+            current_user.name = name
+            db.session.commit()
+            flash("Seu nome foi atualizado!", "success")
+            return redirect(url_for("tasks"))
+    return render_template("profile.html")
+
+# -------------------- Usuárias (apenas gerente) --------------------
+@app.route("/users")
+@login_required
+def users_list():
+    manager_required()
+    users = User.query.order_by(User.role.desc(), User.name.asc()).all()
+    return render_template("users.html", users=users)
+
+@app.route("/users/new", methods=["GET", "POST"])
+@login_required
+def users_new():
+    manager_required()
+    if request.method == "POST":
+        name = (request.form.get("name") or "").strip()
+        email = (request.form.get("email") or "").strip().lower()
+        password = (request.form.get("password") or "").strip()
+        role = (request.form.get("role") or "staff").strip()
+        if role not in ("manager", "staff"):
+            role = "staff"
+
+        if not name or not email or not password:
+            flash("Preencha nome, e-mail e senha.", "danger")
+            return render_template("user_form.html", mode="new")
+
+        if User.query.filter_by(email=email).first():
+            flash("E-mail já cadastrado.", "warning")
+            return render_template("user_form.html", mode="new")
+
+        u = User(name=name, email=email, role=role)
+        u.set_password(password)
+        db.session.add(u)
+        db.session.commit()
+        flash("Usuária criada com sucesso.", "success")
+        return redirect(url_for("users_list"))
+
+    return render_template("user_form.html", mode="new")
+
+@app.route("/users/<int:user_id>/edit", methods=["GET", "POST"])
+@login_required
+def users_edit(user_id):
+    manager_required()
+    u = User.query.get_or_404(user_id)
+
+    if request.method == "POST":
+        name = (request.form.get("name") or "").strip()
+        email = (request.form.get("email") or "").strip().lower()
+        role = (request.form.get("role") or u.role).strip()
+        new_password = (request.form.get("new_password") or "").strip()
+
+        if role not in ("manager", "staff"):
+            role = u.role
+
+        if not name or not email:
+            flash("Nome e e-mail são obrigatórios.", "danger")
+            return render_template("user_form.html", mode="edit", user=u)
+
+        # checa se email já é de outra pessoa
+        exists = User.query.filter(User.email == email, User.id != u.id).first()
+        if exists:
+            flash("E-mail em uso por outra conta.", "warning")
+            return render_template("user_form.html", mode="edit", user=u)
+
+        # impedir remover o último gerente
+        if u.role == "manager" and role == "staff":
+            total_mgrs = User.query.filter_by(role="manager").count()
+            if total_mgrs <= 1:
+                flash("Não é possível remover o último gerente.", "warning")
+                return render_template("user_form.html", mode="edit", user=u)
+
+        u.name = name
+        u.email = email
+        u.role = role
+        if new_password:
+            u.set_password(new_password)
+
+        db.session.commit()
+        flash("Usuária atualizada.", "success")
+        return redirect(url_for("users_list"))
+
+    return render_template("user_form.html", mode="edit", user=u)
+
+@app.route("/users/<int:user_id>/make_manager", methods=["POST"])
+@login_required
+def make_manager(user_id):
+    manager_required()
+    u = User.query.get_or_404(user_id)
+    u.role = "manager"
+    db.session.commit()
+    flash(f"{u.name} agora é gerente.", "success")
+    return redirect(url_for("users_list"))
+
+@app.route("/users/<int:user_id>/make_staff", methods=["POST"])
+@login_required
+def make_staff(user_id):
+    manager_required()
+    u = User.query.get_or_404(user_id)
+    if User.query.filter_by(role="manager").count() <= 1 and u.role == "manager":
+        flash("Não é possível remover o último gerente.", "warning")
+        return redirect(url_for("users_list"))
+    u.role = "staff"
+    db.session.commit()
+    flash(f"{u.name} agora é funcionária.", "success")
+    return redirect(url_for("users_list"))
+
 # -------------------- Tarefas --------------------
 @app.route("/")
 @login_required
@@ -167,53 +280,63 @@ def tasks():
 
     q = Task.query.order_by(Task.created_at.desc())
 
-    # Funcionária: vê só o que ela criou
+    # Funcionária: vê apenas o que ela criou
     if current_user.role != "manager":
         q = q.filter(Task.created_by_id == current_user.id)
+        managers = None
     else:
-        # Gerente pode filtrar por destinatário
+        # Gerente pode filtrar por destinatário (apenas gerentes no filtro)
         if assigned_to_id:
             q = q.filter(Task.assigned_to_id == assigned_to_id)
+        managers = get_managers()
 
     if status in ("pendente", "concluida"):
         q = q.filter(Task.status == status)
 
     items = q.all()
-    managers = get_managers() if current_user.role == "manager" else None
-
-    return render_template("tasks.html", tasks=items, status=status, managers=managers)
+    return render_template("tasks.html",
+                           tasks=items,
+                           status=status,
+                           managers=managers,
+                           assigned_to_id=assigned_to_id)
 
 @app.route("/tasks/new", methods=["GET", "POST"])
 @login_required
 def create_task():
     managers = get_managers()
+    users = get_users() if current_user.role == "manager" else None
 
     if request.method == "POST":
         title = request.form.get("title", "").strip()
-        description = request.form.get("description", "").strip() or None
-        due = request.form.get("due_date", "").strip()
+        description = (request.form.get("description", "") or "").strip() or None
+        due = (request.form.get("due_date", "") or "").strip()
         from datetime import datetime as dt
         due_date = dt.strptime(due, "%Y-%m-%d").date() if due else None
 
-        # Usa a escolha do select (para qualquer papel). Fallbacks cobrem vazios.
         assigned_to = None
         assigned_to_id = request.form.get("assigned_to_id")
         if assigned_to_id:
             assigned_to = User.query.get(int(assigned_to_id))
-            if not assigned_to or assigned_to.role != "manager":
-                assigned_to = None
 
-        if not assigned_to:
-            assigned_to = current_user if current_user.role == "manager" else get_manager_user()
+        # Regras:
+        # - Gerente pode atribuir para QUALQUER usuário.
+        # - Funcionária só pode atribuir para GERENTE (fallback para algum gerente).
+        if current_user.role != "manager":
+            if not assigned_to or assigned_to.role != "manager":
+                assigned_to = get_manager_user()
+        else:
+            if not assigned_to:
+                assigned_to = current_user
 
         if not title:
             flash("Título é obrigatório.", "danger")
-            return render_template("task_form.html", managers=managers,
-                                   default_manager_id=(assigned_to.id if assigned_to else None))
+            return render_template("task_form.html",
+                                   managers=managers, users=users,
+                                   default_assigned_id=(assigned_to.id if assigned_to else None))
 
         if not assigned_to:
-            flash("Nenhum gerente encontrado. Promova alguém em “Usuárias”.", "danger")
-            return render_template("task_form.html", managers=managers)
+            flash("Nenhum destinatário válido encontrado.", "danger")
+            return render_template("task_form.html", managers=managers, users=users)
 
         task = Task(
             title=title,
@@ -227,11 +350,12 @@ def create_task():
         flash("Tarefa criada!", "success")
         return redirect(url_for("tasks"))
 
-    default_manager = current_user if current_user.role == "manager" else get_manager_user()
+    default_assigned = current_user if current_user.role == "manager" else get_manager_user()
     return render_template(
         "task_form.html",
         managers=managers,
-        default_manager_id=default_manager.id if default_manager else None,
+        users=users,
+        default_assigned_id=default_assigned.id if default_assigned else None,
     )
 
 @app.route("/tasks/<int:task_id>/done", methods=["POST"])
@@ -319,37 +443,6 @@ def export_tasks_csv():
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
-# -------------------- Usuárias (apenas gerente) --------------------
-@app.route("/users")
-@login_required
-def users_list():
-    manager_required()
-    users = User.query.order_by(User.role.desc(), User.name.asc()).all()
-    return render_template("users.html", users=users)
-
-@app.route("/users/<int:user_id>/make_manager", methods=["POST"])
-@login_required
-def make_manager(user_id):
-    manager_required()
-    u = User.query.get_or_404(user_id)
-    u.role = "manager"
-    db.session.commit()
-    flash(f"{u.name} agora é gerente.", "success")
-    return redirect(url_for("users_list"))
-
-@app.route("/users/<int:user_id>/make_staff", methods=["POST"])
-@login_required
-def make_staff(user_id):
-    manager_required()
-    u = User.query.get_or_404(user_id)
-    if User.query.filter_by(role="manager").count() <= 1 and u.role == "manager":
-        flash("Não é possível remover o último gerente.", "warning")
-        return redirect(url_for("users_list"))
-    u.role = "staff"
-    db.session.commit()
-    flash(f"{u.name} agora é funcionária.", "success")
-    return redirect(url_for("users_list"))
-
 # -------------------- Troca de senha --------------------
 @app.route("/change-password", methods=["GET", "POST"])
 @login_required
@@ -374,5 +467,6 @@ def change_password():
 
 # -------------------- Exec --------------------
 if __name__ == "__main__":
-    # Em produção o Render usa gunicorn. Localmente você pode rodar assim:
+    with app.app_context():
+        db.create_all()
     app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
