@@ -15,29 +15,35 @@
   </div>
 
   {% if current_user.role == 'manager' %}
+    <!-- Gerente: pode enviar para qualquer usuário -->
     <div class="mb-3">
       <label class="form-label">Atribuir para</label>
       <select name="assigned_to_id" class="form-select">
-        <option value="{{ current_user.id }}" selected>Eu ({{ current_user.name }})</option>
-        {% for m in managers %}
-          {% if m.id != current_user.id %}
-            <option value="{{ m.id }}"
-              {% if default_manager_id and m.id == default_manager_id %}selected{% endif %}>
-              {{ m.name }}
+        {% if default_assigned_id == current_user.id %}
+          <option value="{{ current_user.id }}" selected>Eu ({{ current_user.name }})</option>
+        {% else %}
+          <option value="{{ current_user.id }}">Eu ({{ current_user.name }})</option>
+        {% endif %}
+        {% for u in users %}
+          {% if u.id != current_user.id %}
+            <option value="{{ u.id }}"
+              {% if default_assigned_id and u.id == default_assigned_id %}selected{% endif %}>
+              {{ u.name }}{% if u.role %} ({{ u.role }}){% endif %}
             </option>
           {% endif %}
         {% endfor %}
       </select>
-      <div class="form-text">Se preferir, deixe “Eu” para receber esta tarefa.</div>
+      <div class="form-text">Como gerente, você pode atribuir para qualquer usuária.</div>
     </div>
   {% else %}
+    <!-- Funcionária: só pode enviar para gerentes -->
     <div class="mb-3">
       <label class="form-label">Enviar para o gerente *</label>
       {% if managers and managers|length %}
         <select name="assigned_to_id" class="form-select" required>
           {% for m in managers %}
             <option value="{{ m.id }}"
-              {% if default_manager_id and m.id == default_manager_id %}selected{% endif %}>
+              {% if default_assigned_id and m.id == default_assigned_id %}selected{% endif %}>
               {{ m.name }}
             </option>
           {% endfor %}
@@ -62,3 +68,4 @@
 </form>
 
 {% endblock %}
+
