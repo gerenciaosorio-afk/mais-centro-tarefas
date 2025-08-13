@@ -13,30 +13,22 @@
       <div class="container-fluid">
         <a class="navbar-brand fw-semibold d-flex align-items-center gap-2"
            href="{{ url_for('tasks') if current_user.is_authenticated else url_for('login') }}">
-          {% if logo_exists %}
-            <img src="{{ url_for('static', filename='logo.png') }}" class="brand-logo" alt="{{ CLINIC_NAME }}" style="height:28px;">
-          {% endif %}
+          {% if logo_exists %}<img src="{{ url_for('static', filename='logo.png') }}" class="brand-logo" alt="{{ CLINIC_NAME }}" style="height:28px;">{% endif %}
           <span class="brand-text">{{ CLINIC_NAME }}</span>
         </a>
 
-        <div class="d-flex align-items-center ms-auto gap-3">
+        <div class="d-flex align-items-center ms-auto gap-2">
           {% if current_user.is_authenticated %}
-            {# opcional: saudação; pode remover esta linha se não quiser exibir #}
-            <span class="navbar-text small text-muted">
-              Olá, {{ current_user.name }}{% if current_user.role %} ({{ current_user.role }}){% endif %}
-            </span>
-
             {% if current_user.role == 'manager' %}
               <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('users_list') }}">Usuárias</a>
             {% endif %}
-
+            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('profile') }}">Meu perfil</a>
             <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('change_password') }}">Trocar senha</a>
             <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('logout') }}">Sair</a>
           {% else %}
             <a class="btn btn-primary btn-sm" href="{{ url_for('login') }}">Entrar</a>
           {% endif %}
         </div>
-      </div> <!-- /container-fluid -->
     </nav>
 
     <main class="container mb-5">
@@ -53,5 +45,3 @@
     </main>
   </body>
 </html>
-
-
