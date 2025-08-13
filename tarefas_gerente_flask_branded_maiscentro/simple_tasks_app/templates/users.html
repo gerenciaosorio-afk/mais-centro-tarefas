@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h5 mb-0">Usuárias</h1>
+  <a class="btn btn-success btn-sm" href="{{ url_for('users_new') }}">+ Nova usuária</a>
+</div>
+
+{% if users|length == 0 %}
+  <div class="text-muted">Nenhuma usuária cadastrada.</div>
+{% else %}
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>E-mail</th>
+          <th>Papel</th>
+          <th class="text-end">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+          <tr>
+            <td>{{ u.name }}</td>
+            <td>{{ u.email }}</td>
+            <td>
+              {% if u.role == 'manager' %}
+                <span class="badge text-bg-primary">gerente</span>
+              {% else %}
+                <span class="badge text-bg-secondary">staff</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('users_edit', user_id=u.id) }}">Editar</a>
+              {% if u.role == 'manager' %}
+                <form method="post" action="{{ url_for('make_staff', user_id=u.id) }}" class="d-inline" onsubmit="return confirm('Tornar {{ u.name }} funcionária?');">
+                  <button class="btn btn-sm btn-outline-warning">Tornar staff</button>
+                </form>
+              {% else %}
+                <form method="post" action="{{ url_for('make_manager', user_id=u.id) }}" class="d-inline" onsubmit="return confirm('Promover {{ u.name }} a gerente?');">
+                  <button class="btn btn-sm btn-outline-primary">Promover a gerente</button>
+                </form>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+
+{% endblock %}
