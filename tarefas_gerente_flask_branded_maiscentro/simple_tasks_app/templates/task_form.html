@@ -14,7 +14,6 @@
     <textarea name="description" class="form-control" rows="3"></textarea>
   </div>
 
-  {# Se é gerente, pode escolher a si mesmo ou outro gerente #}
   {% if current_user.role == 'manager' %}
     <div class="mb-3">
       <label class="form-label">Atribuir para</label>
@@ -31,8 +30,6 @@
       </select>
       <div class="form-text">Se preferir, deixe “Eu” para receber esta tarefa.</div>
     </div>
-
-  {# Se é funcionária, precisa escolher um gerente #}
   {% else %}
     <div class="mb-3">
       <label class="form-label">Enviar para o gerente *</label>
