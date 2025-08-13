@@ -225,6 +225,33 @@ def delete_task(task_id):
     flash("Tarefa excluída.", "info")
     return redirect(url_for("tasks"))
 
+@app.route("/change-password", methods=["GET", "POST"])
+@login_required
+def change_password():
+    if request.method == "POST":
+        current = request.form.get("current_password", "")
+        new = request.form.get("new_password", "")
+        confirm = request.form.get("confirm_password", "")
+
+        # validações simples
+        if not current_user.check_password(current):
+            flash("Senha atual incorreta.", "danger")
+        elif len(new) < 8:
+            flash("A nova senha deve ter pelo menos 8 caracteres.", "warning")
+        elif new != confirm:
+            flash("Confirmação diferente da nova senha.", "warning")
+        else:
+            current_user.set_password(new)
+            db.session.commit()
+            # se preferir forçar novo login, descomente:
+            # logout_user()
+            # flash("Senha alterada! Entre novamente.", "success")
+            # return redirect(url_for("login"))
+            flash("Senha alterada com sucesso!", "success")
+            return redirect(url_for("tasks"))
+
+    return render_template("change_password.html")
+
 # -------------------- Exec --------------------
 if __name__ == "__main__":
     with app.app_context():
