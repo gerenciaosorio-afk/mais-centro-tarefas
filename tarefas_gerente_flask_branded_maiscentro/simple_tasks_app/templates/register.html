@@ -1,0 +1,34 @@
+
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6 col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h1 class="h4 mb-3">Cadastro de Funcionária</h1>
+        <form method="post" autocomplete="on">
+          <div class="mb-3">
+            <label class="form-label">Nome</label>
+            <input type="text" name="name" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">E-mail</label>
+            <input type="email" name="email" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Senha</label>
+            <input type="password" name="password" class="form-control" required>
+          </div>
+          <button class="btn btn-primary w-100">Cadastrar</button>
+          <div class="text-center mt-3">
+            <a href="{{ url_for('login') }}">Já tenho conta</a>
+          </div>
+        </form>
+        <p class="small text-muted mt-3 mb-0">
+          Dica: o gerente é criado automaticamente na primeira execução. Todas as novas contas são "staff".
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

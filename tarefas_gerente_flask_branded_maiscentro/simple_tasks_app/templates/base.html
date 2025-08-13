@@ -1,0 +1,40 @@
+
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ CLINIC_NAME }} · Tarefas</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='styles.css') }}" rel="stylesheet">
+    {% if favicon_exists %}<link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">{% endif %}
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg bg-body-tertiary border-bottom mb-3">
+      <div class="container-fluid">
+        <a class="navbar-brand fw-semibold d-flex align-items-center gap-2" href="{{ url_for('tasks') }}">
+          {% if logo_exists %}
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="{{ CLINIC_NAME }}" class="brand-logo">
+          {% endif %}
+          <span class="brand-text">{{ CLINIC_NAME }}</span>
+        </a>
+        <div class="d-flex align-items-center ms-auto gap-3">
+          <span class="navbar-text small text-muted">Olá, {{ current_user.name }} ({{ current_user.role }})</span>
+          <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('logout') }}">Sair</a>
+        </div>
+      </div>
+    </nav>
+    <main class="container mb-5">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="mb-3">
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }} mb-2">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

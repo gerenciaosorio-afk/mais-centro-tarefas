@@ -1,0 +1,18 @@
+body { background: #f8fafc; }
+.list-group-item { background: #fff; }
+.badge { vertical-align: middle; }
+
+/* Branding */
+:root{
+  --bs-primary: #12999D;
+  --brand-accent: #0E777A;
+}
+.brand-logo { height: 28px; }
+.brand-text { white-space: nowrap; }
+
+/* --- Brand overrides added automatically --- */
+.btn-primary{background-color:var(--bs-primary)!important;border-color:var(--bs-primary)!important;}
+.btn-success{background-color:var(--brand-accent)!important;border-color:var(--brand-accent)!important;}
+a{color:var(--bs-primary);}
+.navbar .navbar-brand .brand-text{color:var(--bs-primary);}
+.badge.text-bg-success{background-color:var(--brand-accent)!important;}
