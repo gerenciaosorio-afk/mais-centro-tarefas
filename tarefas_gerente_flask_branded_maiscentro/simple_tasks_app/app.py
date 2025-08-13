@@ -5,6 +5,10 @@ from flask import Flask, render_template, redirect, url_for, request, flash, abo
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+import csv
+from io import StringIO
+from flask import Response
+
 
 # -------------------- Config --------------------
 app = Flask(__name__)
@@ -251,6 +255,49 @@ def change_password():
             return redirect(url_for("tasks"))
 
     return render_template("change_password.html")
+
+@app.route("/tasks/export.csv")
+@login_required
+def export_tasks_csv():
+    status = request.args.get("status")
+    q = Task.query.order_by(Task.created_at.desc())
+
+    # se não for gerente, exporta apenas as tarefas criadas pela usuária logada
+    if current_user.role != "manager":
+        q = q.filter(Task.created_by_id == current_user.id)
+
+    if status in ("pendente", "concluida"):
+        q = q.filter_by(status=status)
+
+    rows = q.all()
+
+    # Usar ; (padrão pt-BR) e BOM para abrir bonito no Excel
+    buf = StringIO()
+    writer = csv.writer(buf, delimiter=";", lineterminator="\n")
+    writer.writerow([
+        "ID", "Título", "Descrição", "Status", "Observação",
+        "Criada em", "Vence em", "Criada por", "Atribuída a"
+    ])
+    for t in rows:
+        writer.writerow([
+            t.id,
+            t.title,
+            t.description or "",
+            t.status,
+            t.observation or "",
+            t.created_at.strftime("%Y-%m-%d %H:%M"),
+            t.due_date.strftime("%Y-%m-%d") if t.due_date else "",
+            t.created_by.name if t.created_by else "",
+            t.assigned_to.name if t.assigned_to else "",
+        ])
+
+    data = buf.getvalue().encode("utf-8-sig")  # BOM p/ Excel
+    filename = f"tarefas_{status or 'todas'}.csv"
+    return Response(
+        data,
+        mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 # -------------------- Exec --------------------
 if __name__ == "__main__":
