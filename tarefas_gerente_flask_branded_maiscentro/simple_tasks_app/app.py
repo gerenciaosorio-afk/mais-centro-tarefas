@@ -9,9 +9,12 @@ from io import StringIO
 
 # -------------------- Config --------------------
 app = Flask(__name__)
+
+# Health check super leve (use /healthz no Render)
 @app.route("/healthz")
 def healthz():
     return "ok", 200
+
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "troque-esta-chave")
 db_url = os.environ.get("DATABASE_URL")
 if db_url:
@@ -89,17 +92,24 @@ def get_manager_user():
 def get_managers():
     return User.query.filter_by(role="manager").order_by(User.name.asc()).all()
 
-# -------------------- Setup inicial (Flask 3) --------------------
-def init_db():
-    db.create_all()
-    if not User.query.filter_by(role="manager").first():
-        admin = User(name="Gerente", email="admin@clinica.com", role="manager")
-        admin.set_password("admin123")
-        db.session.add(admin)
-        db.session.commit()
+# -------------------- Setup inicial (seguro) --------------------
+def init_db_safe():
+    try:
+        with app.app_context():
+            db.create_all()
+            # garante pelo menos 1 gerente
+            if not User.query.filter_by(role="manager").first():
+                admin = User(name="Gerente", email="admin@clinica.com", role="manager")
+                admin.set_password("admin123")
+                db.session.add(admin)
+                db.session.commit()
+        print("DB init OK")
+    except Exception as e:
+        # não derruba o boot se o banco estiver lento/indisponível
+        print("DB init pulado/erro:", e)
 
-with app.app_context():
-    init_db()
+# chama uma única vez na carga do app
+init_db_safe()
 
 # -------------------- Autenticação --------------------
 @app.route("/login", methods=["GET", "POST"])
@@ -362,6 +372,5 @@ def change_password():
 
 # -------------------- Exec --------------------
 if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()
+    # Em produção o Render usa gunicorn. Localmente você pode rodar assim:
     app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
