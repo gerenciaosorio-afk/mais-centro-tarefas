@@ -128,24 +128,42 @@ def logout():
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
-    # Registro aberto cria sempre 'staff'. O gerente pode promover depois.
+    # se veio com ?as_manager=1 na URL, ou no POST oculto
+    as_manager = (request.args.get("as_manager") == "1") or (request.form.get("as_manager") == "1")
+
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
+
         if not name or not email or not password:
             flash("Preencha todos os campos.", "danger")
-            return render_template("register.html")
+            return render_template("register.html", as_manager=as_manager, name=name, email=email)
+
         if User.query.filter_by(email=email).first():
             flash("E-mail já cadastrado.", "warning")
-            return render_template("register.html")
-        user = User(name=name, email=email, role="staff")
+            return render_template("register.html", as_manager=as_manager, name=name, email=email)
+
+        role = "staff"
+        if as_manager:
+            # criar gerente exige MANAGER_INVITE_CODE correto
+            code = (request.form.get("manager_code") or "").strip()
+            if not MANAGER_INVITE_CODE:
+                flash("Cadastro de gerência está desabilitado (sem código configurado).", "warning")
+                return render_template("register.html", as_manager=as_manager, name=name, email=email)
+            if code != MANAGER_INVITE_CODE:
+                flash("Código de convite inválido.", "danger")
+                return render_template("register.html", as_manager=as_manager, name=name, email=email)
+            role = "manager"
+
+        user = User(name=name, email=email, role=role)
         user.set_password(password)
         db.session.add(user)
         db.session.commit()
         flash("Cadastro realizado! Você já pode entrar.", "success")
         return redirect(url_for("login"))
-    return render_template("register.html")
+
+    return render_template("register.html", as_manager=as_manager)
 
 # -------------------- Perfil (usuário edita o próprio nome) --------------------
 @app.route("/profile", methods=["GET", "POST"])
