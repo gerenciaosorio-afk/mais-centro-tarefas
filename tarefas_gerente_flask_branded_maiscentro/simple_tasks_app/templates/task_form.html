@@ -1,49 +1,68 @@
-
 {% extends "base.html" %}
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-md-8 col-lg-7">
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <h1 class="h5 mb-3">Nova tarefa</h1>
-        <form method="post">
-          <div class="mb-3">
-            <label class="form-label">Título</label>
-            <input type="text" name="title" class="form-control" required maxlength="200" placeholder="Ex.: Ligar para fornecedor">
-          </div>
 
-          <div class="mb-3">
-            <label class="form-label">Descrição</label>
-            <textarea name="description" class="form-control" rows="3" placeholder="Detalhes, telefone, etc. (opcional)"></textarea>
-          </div>
+<!-- Cabeçalho com título + Exportar + Nova tarefa -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h5 mb-0">
+    Tarefas
+    {% if status %}
+      — {{ 'Pendentes' if status == 'pendente' else 'Concluídas' }}
+    {% endif %}
+  </h1>
 
-          <div class="row g-3">
-            <div class="col-md-6">
-              <label class="form-label">Prazo (opcional)</label>
-              <input type="date" name="due_date" class="form-control">
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Enviar para (gerente)</label>
-              <select name="assigned_to_id" class="form-select">
-                {% for m in managers %}
-                  <option value="{{ m.id }}" {% if default_manager_id == m.id %}selected{% endif %}>
-                    {{ m.name }} — {{ m.email }}
-                  </option>
-                {% endfor %}
-              </select>
-              {% if managers|length == 0 %}
-                <div class="form-text text-danger">Nenhum gerente cadastrado. Peça para promover alguém em “Usuárias”.</div>
-              {% endif %}
-            </div>
-          </div>
-
-          <div class="mt-4 d-flex justify-content-end gap-2">
-            <a class="btn btn-outline-secondary" href="{{ url_for('tasks') }}">Cancelar</a>
-            <button class="btn btn-primary">Criar tarefa</button>
-          </div>
-        </form>
-      </div>
-    </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary btn-sm"
+       href="{{ url_for('export_tasks_csv', status=status, assigned_to_id=request.args.get('assigned_to_id')) }}">
+       Exportar CSV
+    </a>
+    <a class="btn btn-success btn-sm" href="{{ url_for('create_task') }}">+ Nova tarefa</a>
   </div>
 </div>
-{% endblock %}
+
+<!-- Filtros -->
+<div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+  <!-- Status -->
+  <div class="btn-group" role="group" aria-label="Filtro de status">
+    <a class="btn btn-outline-secondary btn-sm {% if not status %}active{% endif %}"
+       href="{{ url_for('tasks', assigned_to_id=request.args.get('assigned_to_id')) }}">Todas</a>
+    <a class="btn btn-outline-secondary btn-sm {% if status == 'pendente' %}active{% endif %}"
+       href="{{ url_for('tasks', status='pendente', assigned_to_id=request.args.get('assigned_to_id')) }}">Pendentes</a>
+    <a class="btn btn-outline-secondary btn-sm {% if status == 'concluida' %}active{% endif %}"
+       href="{{ url_for('tasks', status='concluida', assigned_to_id=request.args.get('assigned_to_id')) }}">Concluídas</a>
+  </div>
+
+  <!-- Filtro por gerente (só para gerente) -->
+  {% if current_user.role == 'manager' and managers %}
+  <form method="get" class="d-flex align-items-center gap-2 ms-2">
+    {% if status %}
+      <input type="hidden" name="status" value="{{ status }}">
+    {% endif %}
+    <label class="form-label mb-0 small text-muted">Para (gerente):</label>
+    <select name="assigned_to_id" class="form-select form-select-sm" onchange="this.form.submit()">
+      <option value="">Todos</option>
+      {% for m in managers %}
+        <option value="{{ m.id }}" {% if request.args.get('assigned_to_id', type=int) == m.id %}selected{% endif %}>
+          {{ m.name }}
+        </option>
+      {% endfor %}
+    </select>
+    {% if request.args.get('assigned_to_id') %}
+      <a class="btn btn-link btn-sm" href="{{ url_for('tasks', status=status) }}">Limpar</a>
+    {% endif %}
+  </form>
+  {% endif %}
+</div>
+
+{% if tasks|length == 0 %}
+  <div class="text-muted">Sem tarefas por aqui ainda.</div>
+{% else %}
+  <div class="list-group">
+    {% for t in tasks %}
+      <div class="list-group-item">
+        <div class="d-flex justify-content-between align-items-start">
+          <div class="me-3">
+            <div class="d-flex align-items-center gap-2">
+              <h2 class="h6 mb-1">{{ t.title }}</h2>
+              {% if t.status == 'concluida' %}
+                <span class="badge text-b
+
