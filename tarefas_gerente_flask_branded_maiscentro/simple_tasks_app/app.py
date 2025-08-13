@@ -1,4 +1,3 @@
-
 import os
 from datetime import datetime
 from flask import Flask, render_template, redirect, url_for, request, flash, abort, Response
@@ -18,10 +17,10 @@ else:
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///tasks.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-# ---- Branding (nome da clínica via variável de ambiente) ----
+# Branding
 app.config["CLINIC_NAME"] = os.environ.get("CLINIC_NAME", "Mais Centro Clínico")
 
-# ✅ Conexão resiliente
+# Conexão resiliente (útil no Render/Neon)
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_pre_ping": True,
     "pool_recycle": 280,
@@ -63,7 +62,7 @@ class Task(db.Model):
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=True)
     status = db.Column(db.String(20), default="pendente")  # "pendente" | "concluida"
-    observation = db.Column(db.Text, nullable=True)  # anotação/observação do gerente
+    observation = db.Column(db.Text, nullable=True)       # observação do gerente
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     due_date = db.Column(db.Date, nullable=True)
 
@@ -84,11 +83,10 @@ def manager_required():
 def get_manager_user():
     return User.query.filter_by(role="manager").first()
 
-# ✅ NOVO: listar todos os gerentes
 def get_managers():
     return User.query.filter_by(role="manager").order_by(User.name.asc()).all()
 
-# -------------------- Setup inicial (compatível com Flask 3) --------------------
+# -------------------- Setup inicial (Flask 3) --------------------
 def init_db():
     db.create_all()
     if not User.query.filter_by(role="manager").first():
@@ -100,7 +98,7 @@ def init_db():
 with app.app_context():
     init_db()
 
-# -------------------- Rotas de Autenticação --------------------
+# -------------------- Autenticação --------------------
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -140,7 +138,7 @@ def register():
         return redirect(url_for("login"))
     return render_template("register.html")
 
-# -------------------- Rotas de Tarefas --------------------
+# -------------------- Tarefas --------------------
 @app.route("/")
 @login_required
 def home():
@@ -150,19 +148,26 @@ def home():
 @login_required
 def tasks():
     status = request.args.get("status")
+    assigned_to_id = request.args.get("assigned_to_id", type=int)
+
     q = Task.query.order_by(Task.created_at.desc())
 
-    # se não for gerente, mostra só as tarefas criadas pela usuária logada
+    # Funcionária: vê só o que ela criou
     if current_user.role != "manager":
         q = q.filter(Task.created_by_id == current_user.id)
+    else:
+        # Gerente pode filtrar por destinatário
+        if assigned_to_id:
+            q = q.filter(Task.assigned_to_id == assigned_to_id)
 
     if status in ("pendente", "concluida"):
-        q = q.filter_by(status=status)
+        q = q.filter(Task.status == status)
 
     items = q.all()
-    return render_template("tasks.html", tasks=items, status=status)
+    managers = get_managers() if current_user.role == "manager" else None
 
-# ✅ NOVO: criação com escolha de gerente (para funcionárias)
+    return render_template("tasks.html", tasks=items, status=status, managers=managers)
+
 @app.route("/tasks/new", methods=["GET", "POST"])
 @login_required
 def create_task():
@@ -175,24 +180,25 @@ def create_task():
         from datetime import datetime as dt
         due_date = dt.strptime(due, "%Y-%m-%d").date() if due else None
 
-        # para funcionária: usa o select; para gerente: vai para ele mesmo
+        # Usa a escolha do select (para qualquer papel). Fallbacks cobrem vazios.
         assigned_to = None
-        if current_user.role != "manager":
-            assigned_to_id = request.form.get("assigned_to_id")
-            if assigned_to_id:
-                assigned_to = User.query.get(int(assigned_to_id))
-                if not assigned_to or assigned_to.role != "manager":
-                    assigned_to = None
-        else:
-            assigned_to = current_user
+        assigned_to_id = request.form.get("assigned_to_id")
+        if assigned_to_id:
+            assigned_to = User.query.get(int(assigned_to_id))
+            if not assigned_to or assigned_to.role != "manager":
+                assigned_to = None
 
         if not assigned_to:
-            assigned_to = get_manager_user()
+            assigned_to = current_user if current_user.role == "manager" else get_manager_user()
 
         if not title:
             flash("Título é obrigatório.", "danger")
             return render_template("task_form.html", managers=managers,
                                    default_manager_id=(assigned_to.id if assigned_to else None))
+
+        if not assigned_to:
+            flash("Nenhum gerente encontrado. Promova alguém em “Usuárias”.", "danger")
+            return render_template("task_form.html", managers=managers)
 
         task = Task(
             title=title,
@@ -206,7 +212,7 @@ def create_task():
         flash("Tarefa criada!", "success")
         return redirect(url_for("tasks"))
 
-    default_manager = get_manager_user()
+    default_manager = current_user if current_user.role == "manager" else get_manager_user()
     return render_template(
         "task_form.html",
         managers=managers,
@@ -258,38 +264,22 @@ def delete_task(task_id):
     flash("Tarefa excluída.", "info")
     return redirect(url_for("tasks"))
 
-@app.route("/change-password", methods=["GET", "POST"])
-@login_required
-def change_password():
-    if request.method == "POST":
-        current = request.form.get("current_password", "")
-        new = request.form.get("new_password", "")
-        confirm = request.form.get("confirm_password", "")
-
-        if not current_user.check_password(current):
-            flash("Senha atual incorreta.", "danger")
-        elif len(new) < 8:
-            flash("A nova senha deve ter pelo menos 8 caracteres.", "warning")
-        elif new != confirm:
-            flash("Confirmação diferente da nova senha.", "warning")
-        else:
-            current_user.set_password(new)
-            db.session.commit()
-            flash("Senha alterada com sucesso!", "success")
-            return redirect(url_for("tasks"))
-    return render_template("change_password.html")
-
 @app.route("/tasks/export.csv")
 @login_required
 def export_tasks_csv():
     status = request.args.get("status")
+    assigned_to_id = request.args.get("assigned_to_id", type=int)
+
     q = Task.query.order_by(Task.created_at.desc())
 
     if current_user.role != "manager":
         q = q.filter(Task.created_by_id == current_user.id)
+    else:
+        if assigned_to_id:
+            q = q.filter(Task.assigned_to_id == assigned_to_id)
 
     if status in ("pendente", "concluida"):
-        q = q.filter_by(status=status)
+        q = q.filter(Task.status == status)
 
     rows = q.all()
     buf = StringIO()
@@ -308,10 +298,13 @@ def export_tasks_csv():
         ])
     data = buf.getvalue().encode("utf-8-sig")
     filename = f"tarefas_{status or 'todas'}.csv"
-    return Response(data, mimetype="text/csv; charset=utf-8",
-                    headers={"Content-Disposition": f"attachment; filename={filename}"})
+    return Response(
+        data,
+        mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
-# ✅ NOVO: gerenciamento de papéis (apenas gerente)
+# -------------------- Usuárias (apenas gerente) --------------------
 @app.route("/users")
 @login_required
 def users_list():
@@ -341,6 +334,28 @@ def make_staff(user_id):
     db.session.commit()
     flash(f"{u.name} agora é funcionária.", "success")
     return redirect(url_for("users_list"))
+
+# -------------------- Troca de senha --------------------
+@app.route("/change-password", methods=["GET", "POST"])
+@login_required
+def change_password():
+    if request.method == "POST":
+        current = request.form.get("current_password", "")
+        new = request.form.get("new_password", "")
+        confirm = request.form.get("confirm_password", "")
+
+        if not current_user.check_password(current):
+            flash("Senha atual incorreta.", "danger")
+        elif len(new) < 8:
+            flash("A nova senha deve ter pelo menos 8 caracteres.", "warning")
+        elif new != confirm:
+            flash("Confirmação diferente da nova senha.", "warning")
+        else:
+            current_user.set_password(new)
+            db.session.commit()
+            flash("Senha alterada com sucesso!", "success")
+            return redirect(url_for("tasks"))
+    return render_template("change_password.html")
 
 # -------------------- Exec --------------------
 if __name__ == "__main__":
