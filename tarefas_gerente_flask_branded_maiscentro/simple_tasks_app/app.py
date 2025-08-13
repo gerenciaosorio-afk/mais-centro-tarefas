@@ -1,14 +1,12 @@
 
 import os
 from datetime import datetime
-from flask import Flask, render_template, redirect, url_for, request, flash, abort
+from flask import Flask, render_template, redirect, url_for, request, flash, abort, Response
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 import csv
 from io import StringIO
-from flask import Response
-
 
 # -------------------- Config --------------------
 app = Flask(__name__)
@@ -22,6 +20,14 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 # ---- Branding (nome da clínica via variável de ambiente) ----
 app.config["CLINIC_NAME"] = os.environ.get("CLINIC_NAME", "Mais Centro Clínico")
+
+# ✅ CONEXÃO RESILIENTE (coloque antes do db = SQLAlchemy(app))
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    "pool_pre_ping": True,   # testa a conexão antes de usar
+    "pool_recycle": 280,     # recicla conexões antigas
+    "pool_size": 5,
+    "max_overflow": 0,
+}
 
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
@@ -88,11 +94,8 @@ def init_db():
         db.session.add(admin)
         db.session.commit()
 
-# executa a inicialização na carga do app (funciona no Render/Gunicorn)
 with app.app_context():
     init_db()
-# -------------------- Setup inicial --------------------
-
 
 # -------------------- Rotas de Autenticação --------------------
 @app.route("/login", methods=["GET", "POST"])
@@ -247,10 +250,6 @@ def change_password():
         else:
             current_user.set_password(new)
             db.session.commit()
-            # se preferir forçar novo login, descomente:
-            # logout_user()
-            # flash("Senha alterada! Entre novamente.", "success")
-            # return redirect(url_for("login"))
             flash("Senha alterada com sucesso!", "success")
             return redirect(url_for("tasks"))
 
