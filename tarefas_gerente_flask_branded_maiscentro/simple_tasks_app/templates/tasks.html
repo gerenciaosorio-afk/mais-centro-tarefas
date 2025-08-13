@@ -11,20 +11,47 @@
   </h1>
 
   <div class="d-flex gap-2">
-    <a class="btn btn-outline-secondary btn-sm"
-       href="{{ url_for('export_tasks_csv', status=status) }}">
-       Exportar CSV
+    <a
+      class="btn btn-outline-secondary btn-sm"
+      href="{{ url_for('export_tasks_csv', status=status, assigned_to_id=assigned_to_id) }}"
+    >
+      Exportar CSV
     </a>
     <a class="btn btn-success btn-sm" href="{{ url_for('create_task') }}">+ Nova tarefa</a>
   </div>
 </div>
 
-<!-- Filtros -->
+<!-- Filtros de status -->
 <div class="d-flex gap-2 mb-3">
-  <a class="btn btn-outline-secondary btn-sm {% if not status %}active{% endif %}" href="{{ url_for('tasks') }}">Todas</a>
-  <a class="btn btn-outline-secondary btn-sm {% if status == 'pendente' %}active{% endif %}" href="{{ url_for('tasks', status='pendente') }}">Pendentes</a>
-  <a class="btn btn-outline-secondary btn-sm {% if status == 'concluida' %}active{% endif %}" href="{{ url_for('tasks', status='concluida') }}">Concluídas</a>
+  <a class="btn btn-outline-secondary btn-sm {% if not status %}active{% endif %}" href="{{ url_for('tasks', assigned_to_id=assigned_to_id) }}">Todas</a>
+  <a class="btn btn-outline-secondary btn-sm {% if status == 'pendente' %}active{% endif %}" href="{{ url_for('tasks', status='pendente', assigned_to_id=assigned_to_id) }}">Pendentes</a>
+  <a class="btn btn-outline-secondary btn-sm {% if status == 'concluida' %}active{% endif %}" href="{{ url_for('tasks', status='concluida', assigned_to_id=assigned_to_id) }}">Concluídas</a>
 </div>
+
+<!-- Filtro "Para" (apenas gerente) -->
+{% if current_user.role == 'manager' and users %}
+<form method="get" class="mb-3">
+  <div class="row g-2 align-items-end">
+    <div class="col-auto">
+      <label class="form-label mb-1">Para</label>
+      <select name="assigned_to_id" class="form-select">
+        <option value="">(Todos)</option>
+        {% for u in users %}
+          <option value="{{ u.id }}" {% if assigned_to_id and u.id == assigned_to_id %}selected{% endif %}>
+            {{ u.name }}{% if u.role %} ({{ u.role }}){% endif %}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    {% if status %}
+      <input type="hidden" name="status" value="{{ status }}">
+    {% endif %}
+    <div class="col-auto">
+      <button class="btn btn-outline-secondary btn-sm">Filtrar</button>
+    </div>
+  </div>
+</form>
+{% endif %}
 
 {% if tasks|length == 0 %}
   <div class="text-muted">Sem tarefas por aqui ainda.</div>
