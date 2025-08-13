@@ -1,31 +1,69 @@
-
 {% extends "base.html" %}
 {% block content %}
+
+{% set as_manager = request.args.get('as_manager') in ('1', 'true', 'yes') %}
+
 <div class="row justify-content-center">
   <div class="col-md-6 col-lg-5">
     <div class="card shadow-sm">
       <div class="card-body">
-        <h1 class="h4 mb-3">Cadastro de Funcionária</h1>
-        <form method="post" autocomplete="on">
+        <h1 class="h4 mb-3">
+          {{ 'Cadastro de Gerência' if as_manager else 'Cadastro de Funcionária' }}
+        </h1>
+
+        <form method="post"
+              autocomplete="on"
+              {% if as_manager %}
+                action="{{ url_for('register', as_manager=1) }}"
+              {% else %}
+                action="{{ url_for('register') }}"
+              {% endif %}>
           <div class="mb-3">
             <label class="form-label">Nome</label>
             <input type="text" name="name" class="form-control" required>
           </div>
+
           <div class="mb-3">
             <label class="form-label">E-mail</label>
             <input type="email" name="email" class="form-control" required>
           </div>
+
           <div class="mb-3">
             <label class="form-label">Senha</label>
             <input type="password" name="password" class="form-control" required>
+            <div class="form-text">Mínimo de 8 caracteres.</div>
           </div>
-          <button class="btn btn-primary w-100">Cadastrar</button>
-          <div class="text-center mt-3">
+
+          {% if as_manager %}
+          <div class="mb-3">
+            <label class="form-label">Código de convite (gerência)</label>
+            <input type="password" name="invite_code" class="form-control" required
+                   placeholder="Código fornecido pela administração">
+            <div class="form-text">
+              Peça o código ao administrador para criar um acesso de gerência.
+            </div>
+          </div>
+          {% endif %}
+
+          <button class="btn btn-primary w-100">
+            {{ 'Cadastrar (Gerência)' if as_manager else 'Cadastrar' }}
+          </button>
+
+          <div class="text-center mt-3 d-flex justify-content-center gap-2 flex-wrap">
             <a href="{{ url_for('login') }}">Já tenho conta</a>
+            <span class="text-muted">·</span>
+            {% if as_manager %}
+              <a href="{{ url_for('register') }}">Cadastrar como funcionária</a>
+            {% else %}
+              <a href="{{ url_for('register', as_manager=1) }}">Criar conta (gerência)</a>
+            {% endif %}
           </div>
         </form>
+
         <p class="small text-muted mt-3 mb-0">
-          Dica: o gerente é criado automaticamente na primeira execução. Todas as novas contas são "staff".
+          Dica: o primeiro gerente é criado automaticamente na primeira execução do sistema.
+          Novos cadastros são <em>funcionária</em> por padrão. Para criar um gerente, use o link
+          “Criar conta (gerência)” e informe o código de convite.
         </p>
       </div>
     </div>
