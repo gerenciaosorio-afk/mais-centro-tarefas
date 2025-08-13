@@ -92,6 +92,8 @@ def get_manager_user():
 def get_managers():
     return User.query.filter_by(role="manager").order_by(User.name.asc()).all()
 
+def get_users():
+    return User.query.order_by(User.name.asc()).all()
 # -------------------- Setup inicial (seguro) --------------------
 def init_db_safe():
     try:
