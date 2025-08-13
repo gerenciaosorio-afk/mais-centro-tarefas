@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1 class="h5 mb-3">
+  {% if mode == 'edit' %}Editar usuária{% else %}Nova usuária{% endif %}
+</h1>
+
+<form method="post">
+  <div class="mb-3">
+    <label class="form-label">Nome *</label>
+    <input type="text" name="name" class="form-control"
+           value="{{ user.name if user else '' }}" required>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">E-mail *</label>
+    <input type="email" name="email" class="form-control"
+           value="{{ user.email if user else '' }}" required>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">Papel *</label>
+    <select name="role" class="form-select" required>
+      <option value="staff" {% if user and user.role == 'staff' %}selected{% endif %}>staff (funcionária)</option>
+      <option value="manager" {% if user and user.role == 'manager' %}selected{% endif %}>manager (gerente)</option>
+    </select>
+  </div>
+
+  {% if mode == 'new' %}
+    <div class="mb-3">
+      <label class="form-label">Senha *</label>
+      <input type="password" name="password" class="form-control" minlength="8" required>
+    </div>
+  {% else %}
+    <div class="mb-3">
+      <label class="form-label">Nova senha (opcional)</label>
+      <input type="password" name="new_password" class="form-control" minlength="8" placeholder="Deixe em branco para manter a atual">
+    </div>
+  {% endif %}
+
+  <div class="d-flex gap-2">
+    <button class="btn btn-success">Salvar</button>
+    <a href="{{ url_for('users_list') }}" class="btn btn-outline-secondary">Cancelar</a>
+  </div>
+</form>
+
+{% endblock %}
