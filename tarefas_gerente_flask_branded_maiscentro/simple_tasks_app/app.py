@@ -75,16 +75,20 @@ def get_manager_user():
     # Retorna o primeiro usuário gerente
     return User.query.filter_by(role="manager").first()
 
-# -------------------- Setup inicial --------------------
-@app.before_first_request
-def ensure_db_and_seed():
+# -------------------- Setup inicial (compatível com Flask 3) --------------------
+def init_db():
     db.create_all()
-    # Cria um gerente padrão se não existir
     if not User.query.filter_by(role="manager").first():
         admin = User(name="Gerente", email="admin@clinica.com", role="manager")
         admin.set_password("admin123")
         db.session.add(admin)
         db.session.commit()
+
+# executa a inicialização na carga do app (funciona no Render/Gunicorn)
+with app.app_context():
+    init_db()
+# -------------------- Setup inicial --------------------
+
 
 # -------------------- Rotas de Autenticação --------------------
 @app.route("/login", methods=["GET", "POST"])
