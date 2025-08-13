@@ -1,22 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Cabeçalho com título + Exportar + Nova tarefa -->
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h1 class="h5 mb-0">Tarefas
+  <h1 class="h5 mb-0">
+    Tarefas
     {% if status %}
       — {{ 'Pendentes' if status == 'pendente' else 'Concluídas' }}
     {% endif %}
   </h1>
-  <a class="btn btn-outline-secondary btn-sm"
-     href="{{ url_for('export_tasks_csv', status=status) }}">
-     Exportar CSV
-  </a>
+
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary btn-sm"
+       href="{{ url_for('export_tasks_csv', status=status) }}">
+       Exportar CSV
+    </a>
+    <a class="btn btn-success btn-sm" href="{{ url_for('create_task') }}">+ Nova tarefa</a>
+  </div>
 </div>
 
-{% extends "base.html" %}
-{% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h1 class="h4 mb-0">Tarefas</h1>
-  <a class="btn btn-success" href="{{ url_for('create_task') }}">+ Nova tarefa</a>
-</div>
-
+<!-- Filtros -->
 <div class="d-flex gap-2 mb-3">
   <a class="btn btn-outline-secondary btn-sm {% if not status %}active{% endif %}" href="{{ url_for('tasks') }}">Todas</a>
   <a class="btn btn-outline-secondary btn-sm {% if status == 'pendente' %}active{% endif %}" href="{{ url_for('tasks', status='pendente') }}">Pendentes</a>
@@ -42,24 +45,28 @@
                 <span class="badge text-bg-light border">Prazo: {{ t.due_date.strftime('%d/%m/%Y') }}</span>
               {% endif %}
             </div>
+
             {% if t.description %}
               <div class="text-muted small mb-1">{{ t.description }}</div>
             {% endif %}
+
             <div class="small text-muted">
-              Criada por {{ t.created_by.name if t.created_by else '—' }} em {{ t.created_at.strftime('%d/%m/%Y %H:%M') }}
+              Criada por {{ t.created_by.name if t.created_by else '—' }}
+              em {{ t.created_at.strftime('%d/%m/%Y %H:%M') }}
+              · Atribuída a: {{ t.assigned_to.name if t.assigned_to else '—' }}
             </div>
           </div>
 
           <div class="text-end">
             {% if current_user.role == 'manager' %}
               {% if t.status == 'pendente' %}
-              <form method="post" action="{{ url_for('set_done', task_id=t.id) }}" class="d-inline">
-                <button class="btn btn-sm btn-primary">Marcar como feita</button>
-              </form>
+                <form method="post" action="{{ url_for('set_done', task_id=t.id) }}" class="d-inline">
+                  <button class="btn btn-sm btn-primary">Marcar como feita</button>
+                </form>
               {% else %}
-              <form method="post" action="{{ url_for('reopen', task_id=t.id) }}" class="d-inline">
-                <button class="btn btn-sm btn-outline-secondary">Reabrir</button>
-              </form>
+                <form method="post" action="{{ url_for('reopen', task_id=t.id) }}" class="d-inline">
+                  <button class="btn btn-sm btn-outline-secondary">Reabrir</button>
+                </form>
               {% endif %}
               <form method="post" action="{{ url_for('delete_task', task_id=t.id) }}" class="d-inline" onsubmit="return confirm('Excluir esta tarefa?');">
                 <button class="btn btn-sm btn-outline-danger">Excluir</button>
@@ -88,4 +95,5 @@
     {% endfor %}
   </div>
 {% endif %}
+
 {% endblock %}
