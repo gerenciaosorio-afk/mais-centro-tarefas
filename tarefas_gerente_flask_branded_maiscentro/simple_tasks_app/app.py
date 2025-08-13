@@ -21,10 +21,10 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 # ---- Branding (nome da clínica via variável de ambiente) ----
 app.config["CLINIC_NAME"] = os.environ.get("CLINIC_NAME", "Mais Centro Clínico")
 
-# ✅ CONEXÃO RESILIENTE (coloque antes do db = SQLAlchemy(app))
+# ✅ Conexão resiliente
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_pre_ping": True,   # testa a conexão antes de usar
-    "pool_recycle": 280,     # recicla conexões antigas
+    "pool_pre_ping": True,
+    "pool_recycle": 280,
     "pool_size": 5,
     "max_overflow": 0,
 }
@@ -82,8 +82,11 @@ def manager_required():
         abort(403)
 
 def get_manager_user():
-    # Retorna o primeiro usuário gerente
     return User.query.filter_by(role="manager").first()
+
+# ✅ NOVO: listar todos os gerentes
+def get_managers():
+    return User.query.filter_by(role="manager").order_by(User.name.asc()).all()
 
 # -------------------- Setup inicial (compatível com Flask 3) --------------------
 def init_db():
@@ -118,7 +121,7 @@ def logout():
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
-    # Registro aberto cria sempre 'staff'. O gerente pode trocar o papel via SQL se precisar.
+    # Registro aberto cria sempre 'staff'. O gerente pode promover depois.
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         email = request.form.get("email", "").strip().lower()
@@ -159,9 +162,12 @@ def tasks():
     items = q.all()
     return render_template("tasks.html", tasks=items, status=status)
 
+# ✅ NOVO: criação com escolha de gerente (para funcionárias)
 @app.route("/tasks/new", methods=["GET", "POST"])
 @login_required
 def create_task():
+    managers = get_managers()
+
     if request.method == "POST":
         title = request.form.get("title", "").strip()
         description = request.form.get("description", "").strip() or None
@@ -169,23 +175,43 @@ def create_task():
         from datetime import datetime as dt
         due_date = dt.strptime(due, "%Y-%m-%d").date() if due else None
 
+        # para funcionária: usa o select; para gerente: vai para ele mesmo
+        assigned_to = None
+        if current_user.role != "manager":
+            assigned_to_id = request.form.get("assigned_to_id")
+            if assigned_to_id:
+                assigned_to = User.query.get(int(assigned_to_id))
+                if not assigned_to or assigned_to.role != "manager":
+                    assigned_to = None
+        else:
+            assigned_to = current_user
+
+        if not assigned_to:
+            assigned_to = get_manager_user()
+
         if not title:
             flash("Título é obrigatório.", "danger")
-            return render_template("task_form.html")
+            return render_template("task_form.html", managers=managers,
+                                   default_manager_id=(assigned_to.id if assigned_to else None))
 
-        manager = get_manager_user()
         task = Task(
             title=title,
             description=description,
             created_by=current_user,
-            assigned_to=manager,
+            assigned_to=assigned_to,
             due_date=due_date,
         )
         db.session.add(task)
         db.session.commit()
-        flash("Tarefa criada para o gerente.", "success")
+        flash("Tarefa criada!", "success")
         return redirect(url_for("tasks"))
-    return render_template("task_form.html")
+
+    default_manager = get_manager_user()
+    return render_template(
+        "task_form.html",
+        managers=managers,
+        default_manager_id=default_manager.id if default_manager else None,
+    )
 
 @app.route("/tasks/<int:task_id>/done", methods=["POST"])
 @login_required
@@ -240,7 +266,6 @@ def change_password():
         new = request.form.get("new_password", "")
         confirm = request.form.get("confirm_password", "")
 
-        # validações simples
         if not current_user.check_password(current):
             flash("Senha atual incorreta.", "danger")
         elif len(new) < 8:
@@ -252,7 +277,6 @@ def change_password():
             db.session.commit()
             flash("Senha alterada com sucesso!", "success")
             return redirect(url_for("tasks"))
-
     return render_template("change_password.html")
 
 @app.route("/tasks/export.csv")
@@ -261,7 +285,6 @@ def export_tasks_csv():
     status = request.args.get("status")
     q = Task.query.order_by(Task.created_at.desc())
 
-    # se não for gerente, exporta apenas as tarefas criadas pela usuária logada
     if current_user.role != "manager":
         q = q.filter(Task.created_by_id == current_user.id)
 
@@ -269,8 +292,6 @@ def export_tasks_csv():
         q = q.filter_by(status=status)
 
     rows = q.all()
-
-    # Usar ; (padrão pt-BR) e BOM para abrir bonito no Excel
     buf = StringIO()
     writer = csv.writer(buf, delimiter=";", lineterminator="\n")
     writer.writerow([
@@ -279,24 +300,47 @@ def export_tasks_csv():
     ])
     for t in rows:
         writer.writerow([
-            t.id,
-            t.title,
-            t.description or "",
-            t.status,
-            t.observation or "",
+            t.id, t.title, t.description or "", t.status, t.observation or "",
             t.created_at.strftime("%Y-%m-%d %H:%M"),
             t.due_date.strftime("%Y-%m-%d") if t.due_date else "",
             t.created_by.name if t.created_by else "",
             t.assigned_to.name if t.assigned_to else "",
         ])
-
-    data = buf.getvalue().encode("utf-8-sig")  # BOM p/ Excel
+    data = buf.getvalue().encode("utf-8-sig")
     filename = f"tarefas_{status or 'todas'}.csv"
-    return Response(
-        data,
-        mimetype="text/csv; charset=utf-8",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
-    )
+    return Response(data, mimetype="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f"attachment; filename={filename}"})
+
+# ✅ NOVO: gerenciamento de papéis (apenas gerente)
+@app.route("/users")
+@login_required
+def users_list():
+    manager_required()
+    users = User.query.order_by(User.role.desc(), User.name.asc()).all()
+    return render_template("users.html", users=users)
+
+@app.route("/users/<int:user_id>/make_manager", methods=["POST"])
+@login_required
+def make_manager(user_id):
+    manager_required()
+    u = User.query.get_or_404(user_id)
+    u.role = "manager"
+    db.session.commit()
+    flash(f"{u.name} agora é gerente.", "success")
+    return redirect(url_for("users_list"))
+
+@app.route("/users/<int:user_id>/make_staff", methods=["POST"])
+@login_required
+def make_staff(user_id):
+    manager_required()
+    u = User.query.get_or_404(user_id)
+    if User.query.filter_by(role="manager").count() <= 1 and u.role == "manager":
+        flash("Não é possível remover o último gerente.", "warning")
+        return redirect(url_for("users_list"))
+    u.role = "staff"
+    db.session.commit()
+    flash(f"{u.name} agora é funcionária.", "success")
+    return redirect(url_for("users_list"))
 
 # -------------------- Exec --------------------
 if __name__ == "__main__":
