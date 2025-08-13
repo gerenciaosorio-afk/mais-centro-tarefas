@@ -9,7 +9,11 @@ from werkzeug.security import generate_password_hash, check_password_hash
 # -------------------- Config --------------------
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "troque-esta-chave")
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///tasks.db"
+db_url = os.environ.get("DATABASE_URL")
+if db_url:
+    app.config["SQLALCHEMY_DATABASE_URI"] = db_url
+else:
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///tasks.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 # ---- Branding (nome da clínica via variável de ambiente) ----
