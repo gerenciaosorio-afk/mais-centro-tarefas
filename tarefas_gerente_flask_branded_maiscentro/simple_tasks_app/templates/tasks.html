@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
 
+{# pega o assigned_to_id vindo na querystring e converte para int #}
+{% set assigned_to_id = (request.args.get('assigned_to_id')|int) if request.args.get('assigned_to_id') else None %}
+
 <!-- Cabeçalho com título + Exportar + Nova tarefa -->
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h1 class="h5 mb-0">
@@ -23,20 +26,25 @@
 
 <!-- Filtros de status -->
 <div class="d-flex gap-2 mb-3">
-  <a class="btn btn-outline-secondary btn-sm {% if not status %}active{% endif %}" href="{{ url_for('tasks', assigned_to_id=assigned_to_id) }}">Todas</a>
-  <a class="btn btn-outline-secondary btn-sm {% if status == 'pendente' %}active{% endif %}" href="{{ url_for('tasks', status='pendente', assigned_to_id=assigned_to_id) }}">Pendentes</a>
-  <a class="btn btn-outline-secondary btn-sm {% if status == 'concluida' %}active{% endif %}" href="{{ url_for('tasks', status='concluida', assigned_to_id=assigned_to_id) }}">Concluídas</a>
+  <a class="btn btn-outline-secondary btn-sm {% if not status %}active{% endif %}"
+     href="{{ url_for('tasks', assigned_to_id=assigned_to_id) }}">Todas</a>
+
+  <a class="btn btn-outline-secondary btn-sm {% if status == 'pendente' %}active{% endif %}"
+     href="{{ url_for('tasks', status='pendente', assigned_to_id=assigned_to_id) }}">Pendentes</a>
+
+  <a class="btn btn-outline-secondary btn-sm {% if status == 'concluida' %}active{% endif %}"
+     href="{{ url_for('tasks', status='concluida', assigned_to_id=assigned_to_id) }}">Concluídas</a>
 </div>
 
 <!-- Filtro "Para" (apenas gerente) -->
-{% if current_user.role == 'manager' and users %}
+{% if current_user.role == 'manager' and managers %}
 <form method="get" class="mb-3">
   <div class="row g-2 align-items-end">
     <div class="col-auto">
       <label class="form-label mb-1">Para</label>
       <select name="assigned_to_id" class="form-select">
         <option value="">(Todos)</option>
-        {% for u in users %}
+        {% for u in managers %}
           <option value="{{ u.id }}" {% if assigned_to_id and u.id == assigned_to_id %}selected{% endif %}>
             {{ u.name }}{% if u.role %} ({{ u.role }}){% endif %}
           </option>
