@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="pt-br">
   <head>
@@ -12,18 +11,25 @@
   <body>
     <nav class="navbar navbar-expand-lg bg-body-tertiary border-bottom mb-3">
       <div class="container-fluid">
-        <a class="navbar-brand fw-semibold d-flex align-items-center gap-2" href="{{ url_for('tasks') }}">
-          {% if logo_exists %}
-            <img src="{{ url_for('static', filename='logo.png') }}" alt="{{ CLINIC_NAME }}" class="brand-logo">
-          {% endif %}
+        <a class="navbar-brand fw-semibold d-flex align-items-center gap-2"
+           href="{{ url_for('tasks') if current_user.is_authenticated else url_for('login') }}">
+          {% if logo_exists %}<img src="{{ url_for('static', filename='logo.png') }}" class="brand-logo" alt="{{ CLINIC_NAME }}" style="height:28px;">{% endif %}
           <span class="brand-text">{{ CLINIC_NAME }}</span>
         </a>
+
         <div class="d-flex align-items-center ms-auto gap-3">
-          <span class="navbar-text small text-muted">Olá, {{ current_user.name }} ({{ current_user.role }})</span>
-          <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('logout') }}">Sair</a>
+          {% if current_user.is_authenticated %}
+            <span class="navbar-text small text-muted">
+              Olá, {{ current_user.name }}{% if current_user.role %} ({{ current_user.role }}){% endif %}
+            </span>
+            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('logout') }}">Sair</a>
+          {% else %}
+            <a class="btn btn-primary btn-sm" href="{{ url_for('login') }}">Entrar</a>
+          {% endif %}
         </div>
       </div>
     </nav>
+
     <main class="container mb-5">
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
