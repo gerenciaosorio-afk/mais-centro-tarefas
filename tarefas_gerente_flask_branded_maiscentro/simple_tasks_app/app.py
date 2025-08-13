@@ -9,6 +9,9 @@ from io import StringIO
 
 # -------------------- Config --------------------
 app = Flask(__name__)
+@app.route("/healthz")
+def healthz():
+    return "ok", 200
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "troque-esta-chave")
 db_url = os.environ.get("DATABASE_URL")
 if db_url:
